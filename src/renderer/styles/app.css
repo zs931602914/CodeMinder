@@ -1,0 +1,441 @@
+/* 全局样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 应用容器 - 左右分栏布局 */
+.app {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background-color: #1e1e1e;
+}
+
+/* 左侧面板 - Tab管理 */
+.sidebar {
+  width: 240px;
+  min-width: 180px;
+  max-width: 320px;
+  background-color: #252526;
+  border-right: 1px solid #3e3e3e;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 终端列表 */
+.terminal-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.terminal-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-list::-webkit-scrollbar-track {
+  background: #252526;
+}
+
+.terminal-list::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+.terminal-list::-webkit-scrollbar-thumb:hover {
+  background: #4e4e4e;
+}
+
+/* 终端列表项 */
+.terminal-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  margin: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease;
+  color: #cccccc;
+  font-size: 13px;
+}
+
+.terminal-item:hover {
+  background-color: #2d2d2d;
+}
+
+.terminal-item.active {
+  background-color: #37373d;
+  color: #ffffff;
+}
+
+.terminal-item-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.terminal-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-item-close {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888888;
+  font-size: 16px;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.terminal-item:hover .terminal-item-close {
+  opacity: 1;
+}
+
+.terminal-item-close:hover {
+  background-color: #4e4e4e;
+  color: #cccccc;
+}
+
+/* 新建终端按钮 */
+.new-terminal-btn {
+  margin: 8px;
+  padding: 12px;
+  background-color: #0e639c;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+
+.new-terminal-btn:hover {
+  background-color: #1177bb;
+}
+
+/* Hook 配置按钮 */
+.hook-config-btn {
+  margin: 0 8px 8px 8px;
+  padding: 10px 12px;
+  background-color: #3c3c3c;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #cccccc;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+
+/* 防窥模式按钮 */
+.privacy-toggle-btn {
+  margin: 0 8px 4px 8px;
+  padding: 8px 12px;
+  background-color: #3c3c3c;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #cccccc;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.privacy-toggle-btn:hover {
+  background-color: #4e4e4e;
+  border-color: #666;
+}
+
+.privacy-toggle-btn.active {
+  background-color: #2d2d5e;
+  border-color: #5a5aad;
+  color: #a0a0e0;
+}
+
+.hook-config-btn:hover {
+  background-color: #4e4e4e;
+  border-color: #666;
+}
+
+.hook-config-btn.success {
+  background-color: #388a34;
+  border-color: #4ca64c;
+  color: #ffffff;
+}
+
+.new-terminal-btn:active {
+  background-color: #0d5a8c;
+}
+
+/* 右侧终端内容区域 */
+.terminal-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.terminal-wrapper {
+  flex: 1;
+  display: none;
+  height: 100%;
+}
+
+.terminal-wrapper.active {
+  display: flex;
+}
+
+/* xterm.js 容器 */
+.xterm-container {
+  flex: 1;
+  padding: 8px;
+  background-color: #1e1e1e;
+}
+
+.xterm-container .xterm {
+  width: 100%;
+  height: 100%;
+}
+
+/* ========== 修复滚动条无法拖动的问题 ========== */
+/* 解决方案来源: https://github.com/xtermjs/xterm.js/issues/512
+ * 问题: canvas 元素覆盖了滚动条区域，导致无法点击拖动
+ * 解决: 限制 .xterm-screen 和 .xterm-rows 的宽度，为滚动条留出空间 */
+
+.xterm-container .xterm-viewport {
+  overflow-y: auto !important;
+}
+
+.xterm-container .xterm-screen {
+  position: relative !important;
+  width: calc(100% - 10px) !important;
+}
+
+.xterm-container .xterm-rows {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  overflow: hidden !important;
+}
+
+/* WebKit 浏览器 (Chromium/Electron) */
+.xterm-container .xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.xterm-container .xterm-viewport::-webkit-scrollbar-track {
+  background-color: #1e1e1e;
+  border-radius: 0;
+}
+
+.xterm-container .xterm-viewport::-webkit-scrollbar-thumb {
+  background-color: #5a5a5a;
+  border-radius: 5px;
+  border: 2px solid #1e1e1e;
+}
+
+.xterm-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background-color: #6e6e6e;
+}
+
+.xterm-container .xterm-viewport::-webkit-scrollbar-thumb:active {
+  background-color: #808080;
+}
+
+/* Firefox */
+.xterm-container .xterm-viewport {
+  scrollbar-color: #5a5a5a #1e1e1e;
+  scrollbar-width: thin;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #666666;
+  background-color: #1e1e1e;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state-text {
+  font-size: 16px;
+}
+
+/* ========== 通知状态样式 ========== */
+
+/* 闪烁动画 - 需要授权 */
+@keyframes notification-flash {
+  0%, 100% {
+    background-color: #2d2d2d !important;  /* 使用 !important 确保覆盖 */
+    border-left: 3px solid transparent;
+  }
+  50% {
+    background-color: #4a3a3a !important;  /* 使用 !important 确保覆盖 */
+    border-left: 3px solid #ff6b6b;
+  }
+}
+
+/* 脉冲动画 */
+@keyframes notification-pulse {
+  0%, 100% {
+    text-shadow: 0 0 0 rgba(255, 107, 107, 0);
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
+    transform: scale(1.2);
+  }
+}
+
+/* 调试样式：用于验证类是否被应用 */
+.terminal-item.notification-auth {
+  animation: notification-flash 1.5s ease-in-out infinite !important;
+  /* 调试用：添加一个明显的边框 */
+  outline: 2px solid #ff0000 !important;
+  outline-offset: -2px;
+}
+
+.terminal-item.notification-auth .terminal-item-icon {
+  color: #ff6b6b !important;
+  animation: notification-pulse 1.5s ease-in-out infinite !important;
+  /* 调试用：添加明显的文字样式 */
+  font-weight: bold !important;
+  font-size: 16px !important;
+}
+
+/* 会话结束的通知 */
+.terminal-item.notification-ended {
+  background-color: #3a3a3a !important;
+  border-left: 3px solid #ffd93d !important;
+  opacity: 0.8;
+  /* 调试用：添加一个明显的边框 */
+  outline: 2px solid #ffff00 !important;
+  outline-offset: -2px;
+}
+
+.terminal-item.notification-ended .terminal-item-icon {
+  color: #ffd93d !important;
+  font-weight: bold !important;
+}
+
+/* 错误通知 */
+.terminal-item.notification-error {
+  background-color: #4a2a2a !important;
+  border-left: 3px solid #ff4444 !important;
+  /* 调试用：添加一个明显的边框 */
+  outline: 2px solid #ff0000 !important;
+  outline-offset: -2px;
+}
+
+.terminal-item.notification-error .terminal-item-icon {
+  color: #ff4444 !important;
+  font-weight: bold !important;
+}
+
+/* ========== 右键菜单样式 ========== */
+
+.context-menu {
+  background-color: #252526;
+  border: 1px solid #3e3e3e;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  min-width: 200px;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: #cccccc;
+  font-size: 13px;
+  transition: background-color 0.1s ease;
+}
+
+.context-menu-item:hover {
+  background-color: #2d2d2d;
+}
+
+.context-menu-icon {
+  width: 20px;
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.context-menu-shortcut {
+  margin-left: auto;
+  color: #888888;
+  font-size: 12px;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background-color: #3e3e3e;
+  margin: 4px 0;
+}
+
+/* ========== 内联编辑样式 ========== */
+.terminal-title-input {
+  background-color: #3c3c3c;
+  border: 1px solid #0e639c;
+  border-radius: 2px;
+  color: #cccccc;
+  font-size: 13px;
+  padding: 2px 6px;
+  width: 100%;
+  font-family: inherit;
+  flex: 1;
+}
+
+.terminal-title-input:focus {
+  outline: none;
+  border-color: #1177bb;
+}
+
+/* ========== 置顶标识样式 ========== */
+.terminal-item.pinned .terminal-item-title::before {
+  content: '📌';
+  margin-right: 4px;
+  font-size: 11px;
+}

@@ -1,0 +1,29 @@
+{
+  "_comment": "Claude Code Hooks 推荐配置 - 复制到 %USERPROFILE%\\.claude\\settings.json",
+  "_description": "使用命名管道方式，延迟极低（~0ms）",
+  "_note": "重要：使用 cmd //c（非 cmd /c），路径使用反斜杠",
+
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd //c \"D:\\myProject\\cctm\\tools\\hook-notify.cmd\" auth_required"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd //c \"D:\\myProject\\cctm\\tools\\hook-notify.cmd\" session_ended"
+          }
+        ]
+      }
+    ]
+  }
+}

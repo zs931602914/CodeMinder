@@ -1,0 +1,59 @@
+{
+  "name": "codeminder",
+  "version": "1.0.0",
+  "description": "Claude Code session manager - smart notifications for multi-terminal workflows",
+  "main": ".webpack/main",
+  "scripts": {
+    "start": "chcp 65001 > nul && electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "keywords": [
+    "electron",
+    "terminal",
+    "powershell",
+    "multiplexer",
+    "claude-code",
+    "session-manager"
+  ],
+  "author": "yts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zs931602914/CodeMinder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zs931602914/CodeMinder/issues"
+  },
+  "homepage": "https://github.com/zs931602914/CodeMinder#readme",
+  "dependencies": {
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.6.0",
+    "@electron-forge/maker-deb": "^7.6.0",
+    "@electron-forge/maker-rpm": "^7.6.0",
+    "@electron-forge/maker-squirrel": "^7.6.0",
+    "@electron-forge/maker-zip": "^7.6.0",
+    "@electron-forge/plugin-fuses": "^7.6.0",
+    "@electron-forge/plugin-webpack": "^7.6.0",
+    "@electron/fuses": "^1.8.0",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^9.0.7",
+    "copy-webpack-plugin": "^12.0.0",
+    "css-loader": "^6.9.0",
+    "electron": "^30.5.1",
+    "node-pty": "^1.1.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "style-loader": "^3.3.0",
+    "ts-loader": "^9.5.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0",
+    "webpack": "^5.90.0",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0"
+  }
+}
