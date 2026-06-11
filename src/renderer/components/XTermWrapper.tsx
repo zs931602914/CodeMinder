@@ -180,14 +180,16 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
         }
         // 没有选中文本时，让 Ctrl+C 正常传递（用于中断命令）
       }
-      // Ctrl+V: 粘贴
+      // Ctrl+V: 智能粘贴（图片优先，回退文本）
       if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
         e.preventDefault();
         e.stopPropagation();
-        navigator.clipboard.readText().then(text => {
-          if (text) {
-            // 发送数据到 PTY
-            onDataRef.current?.(text);
+        window.electronAPI.clipboardReadForPaste().then(result => {
+          if (!result) return;
+          if (result.type === 'image') {
+            onDataRef.current?.(result.path);
+          } else {
+            onDataRef.current?.(result.text);
           }
         }).catch(() => {
           // 粘贴失败时静默处理
@@ -436,14 +438,13 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
     terminal.focus();
 
     try {
-      const text = await navigator.clipboard.readText();
-      if (!text) return;
-
-      // terminal.paste() 不会触发 onData 事件，需要手动处理
-      // 1. 发送数据到 PTY
-      onDataRef.current?.(text);
-      // 2. 同时写入终端显示（PTY 会 echo 回来，但为了即时反馈）
-      // 注意：这里不需要手动 write，因为 PTY 的响应会通过 onTerminalData 写入
+      const result = await window.electronAPI.clipboardReadForPaste();
+      if (!result) return;
+      if (result.type === 'image') {
+        onDataRef.current?.(result.path);
+      } else {
+        onDataRef.current?.(result.text);
+      }
     } catch {
       // 粘贴失败时静默处理
     }
