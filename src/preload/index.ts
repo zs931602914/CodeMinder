@@ -24,6 +24,9 @@ export interface ElectronAPI {
   updateTerminalTitle: (id: string, title: string) => Promise<void>;
   toggleTerminalPinned: (id: string) => Promise<void>;
 
+  // 剪贴板操作
+  clipboardReadForPaste: () => Promise<{ type: 'image'; path: string } | { type: 'text'; text: string } | null>;
+
   // Hook 配置
   getHookConfig: () => Promise<{ config: string; hookPath: string; exists: boolean }>;
   copyHookConfig: () => Promise<{ success: boolean }>;
@@ -61,6 +64,9 @@ const electronAPI: ElectronAPI = {
   toggleTerminalPinned: (id: string) => {
     return ipcRenderer.invoke('terminal:togglePinned', id);
   },
+
+  // 剪贴板操作
+  clipboardReadForPaste: () => ipcRenderer.invoke('clipboard:read-for-paste'),
 
   // Hook 配置
   getHookConfig: () => ipcRenderer.invoke('hook-config:get'),
