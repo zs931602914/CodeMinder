@@ -3,6 +3,7 @@ import { ptyService, PtyDataEvent, PtyExitEvent } from '../services/pty-service'
 import { sessionManager } from '../services/session-manager';
 import { windowFlashManager } from '../services/window-flash-manager';
 import { NotificationType } from '../../renderer/types/terminal';
+import { clipboardService } from '../services/clipboard-service';
 
 /**
  * UUID v4 格式验证正则
@@ -183,6 +184,11 @@ export function registerTerminalIpcHandlers(): void {
     if (changed) {
       sendNotificationUpdate();
     }
+  });
+
+  // 剪贴板智能粘贴：优先检测图片，回退到文本
+  ipcMain.handle('clipboard:read-for-paste', () => {
+    return clipboardService.readForPaste();
   });
 
   // 监听 PTY 数据输出，转发到渲染进程
