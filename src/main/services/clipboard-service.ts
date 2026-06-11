@@ -1,6 +1,7 @@
 import { clipboard, app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 
 type PasteResult =
   | { type: 'image'; path: string }
@@ -31,7 +32,7 @@ class ClipboardService {
       }
     }
 
-    // 检测文件引用（从文件管理器复制文件时，剪贴板格式为 text/uri-list）
+    // 检测文件引用（从文件管理器复制文件时）
     const filePath = this.readFilePathFromClipboard();
     if (filePath) {
       if (this.isImageFile(filePath)) {
@@ -50,25 +51,44 @@ class ClipboardService {
   }
 
   /**
-   * 从剪贴板的 text/uri-list 格式中提取文件路径
+   * 从剪贴板提取文件路径。
+   * 优先用 Electron API（text/uri-list），失败时回退到 PowerShell。
    */
   private readFilePathFromClipboard(): string | null {
+    // 方式 1: Electron readBuffer
     try {
       const buffer = clipboard.readBuffer('text/uri-list');
-      if (buffer.length === 0) return null;
-
-      const uriList = buffer.toString('utf-8').trim();
-      const uris = uriList.split(/\r?\n/).filter(line => line && !line.startsWith('#'));
-      if (uris.length === 0) return null;
-
-      const uri = uris[0];
-      if (uri.startsWith('file:///')) {
-        const filePath = decodeURIComponent(uri.substring(8));
-        if (fs.existsSync(filePath)) {
-          return filePath;
+      if (buffer.length > 0) {
+        const uriList = buffer.toString('utf-8').trim();
+        const uris = uriList.split(/\r?\n/).filter(line => line && !line.startsWith('#'));
+        if (uris.length > 0 && uris[0].startsWith('file:///')) {
+          const filePath = decodeURIComponent(uris[0].substring(8));
+          if (fs.existsSync(filePath)) {
+            return filePath;
+          }
         }
       }
     } catch { /* ignore */ }
+
+    // 方式 2: Windows PowerShell 后备方案
+    if (process.platform === 'win32') {
+      try {
+        const result = execSync(
+          'powershell -NoProfile -Command "Get-Clipboard -Format FileDropList | ForEach-Object { $_.FullName }"',
+          { encoding: 'utf-8', timeout: 3000 }
+        ).trim();
+        if (result) {
+          // 多文件时取第一行
+          const firstFile = result.split(/\r?\n/)[0].trim();
+          if (firstFile && fs.existsSync(firstFile)) {
+            return firstFile;
+          }
+        }
+      } catch (err) {
+        console.error('[ClipboardService] PowerShell clipboard read failed:', err);
+      }
+    }
+
     return null;
   }
 
