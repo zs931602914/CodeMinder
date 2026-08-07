@@ -41,7 +41,13 @@ export function handleSpawn(rawBody: unknown): SpawnResult | SpawnErrorResponse 
   const prompt = buildInitialPrompt(body);
   const initialCommand = buildClaudeSpawnCommand(prompt);
 
-  ptyService.create(session.id, { cwd: body.cwd, initialCommand });
+  try {
+    ptyService.create(session.id, { cwd: body.cwd, initialCommand });
+  } catch (e) {
+    // pty 创建失败（如 ConPTY 初始化失败）：回滚会话，避免孤儿会话
+    sessionManager.delete(session.id);
+    return { error: `派生终端失败: ${(e as Error).message}` };
+  }
 
   if (body.focus !== false) {
     sessionManager.setActive(session.id);
