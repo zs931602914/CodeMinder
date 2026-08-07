@@ -101,3 +101,18 @@ export function validateSpawnBody(body: unknown): ValidationResult {
 
   return { ok: true, normalized };
 }
+
+export function deriveTitle(body: SpawnBody, fallbackIndex: number): string {
+  const title = body.title?.trim();
+  if (title) return title;
+
+  const task = body.task?.trim();
+  if (task) return task.length > 12 ? task.slice(0, 12) + '…' : task;
+
+  if (body.files && body.files.length > 0) {
+    const first = body.files[0];
+    return first.split(/[\\/]/).pop() || first;
+  }
+
+  return `Terminal ${fallbackIndex}`;
+}

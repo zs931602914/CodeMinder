@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildInitialPrompt, validateSpawnBody } from './spawn-prompt';
+import { buildInitialPrompt, validateSpawnBody, deriveTitle } from './spawn-prompt';
 
 describe('buildInitialPrompt', () => {
   it('全信息：含 Read、Skill、执行任务', () => {
@@ -73,5 +73,25 @@ describe('validateSpawnBody', () => {
   it('非对象根 → 失败', () => {
     expect(validateSpawnBody(null).ok).toBe(false);
     expect(validateSpawnBody('s').ok).toBe(false);
+  });
+});
+
+describe('deriveTitle', () => {
+  it('显式 title 优先', () => {
+    expect(deriveTitle({ title: '我的标题' }, 3)).toBe('我的标题');
+  });
+  it('无 title 用 task 前 12 字，超长截断加 …', () => {
+    expect(deriveTitle({ task: '一二三四五六七八九十一二三四五' }, 1)).toBe('一二三四五六七八九十一二…');
+    expect(deriveTitle({ task: '短任务' }, 1)).toBe('短任务');
+  });
+  it('无 title/task 用首文件名', () => {
+    expect(deriveTitle({ files: ['C:/x/y/notes.md'] }, 1)).toBe('notes.md');
+    expect(deriveTitle({ files: ['a\\b\\c.ts'] }, 1)).toBe('c.ts');
+  });
+  it('全空用 Terminal N', () => {
+    expect(deriveTitle({}, 5)).toBe('Terminal 5');
+  });
+  it('空白 title 回退', () => {
+    expect(deriveTitle({ title: '   ', task: '实际任务' }, 1)).toBe('实际任务');
   });
 });
