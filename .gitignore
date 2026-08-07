@@ -30,5 +30,6 @@ Thumbs.db
 .env.local
 
 # Claude Code / AI tools
-.claude/
+.claude/*
+!.claude/skills/
 .serena/
