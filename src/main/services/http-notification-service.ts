@@ -3,6 +3,7 @@ import { sessionManager } from './session-manager';
 import { windowFlashManager } from './window-flash-manager';
 import { NotificationType } from '../../renderer/types/terminal';
 import { BrowserWindow } from 'electron';
+import { handleSpawn } from './spawn-service';
 
 /**
  * HTTP 通知服务 - 监听本地端口接收通知
@@ -58,6 +59,21 @@ export class HttpNotificationService {
             this.handleNotification(notification);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true, message: '通知已发送' }));
+          } catch (error) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ error: '无效的 JSON 格式' }));
+          }
+        });
+      } else if (req.method === 'POST' && req.url === '/spawn') {
+        let body = '';
+        req.on('data', (chunk) => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const parsed = JSON.parse(body);
+            const result = handleSpawn(parsed);
+            const ok = !('error' in result);
+            res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(result));
           } catch (error) {
             res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ error: '无效的 JSON 格式' }));
