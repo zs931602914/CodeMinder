@@ -2,7 +2,9 @@ import * as pty from 'node-pty';
 import { EventEmitter } from 'events';
 import { sessionManager } from './session-manager';
 import { NotificationType } from '../../renderer/types/terminal';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, app } from 'electron';
+import * as path from 'path';
+import * as fs from 'fs';
 
 /**
  * 终端数据事件
@@ -27,33 +29,61 @@ export class PtyService extends EventEmitter {
   private ptys: Map<string, pty.IPty> = new Map();
 
   /**
+   * 解析 codeminder-spawn.js 的绝对路径（适配开发与打包）。
+   * 打包后位于 extraResource（process.resourcesPath/tools）；开发时位于项目根 tools/。
+   */
+  private resolveSpawnScriptPath(): string | null {
+    const candidates = [
+      path.join(process.resourcesPath, 'tools', 'codeminder-spawn.js'),
+      path.join(app.getAppPath(), '..', 'tools', 'codeminder-spawn.js'),
+      path.join(__dirname, '..', '..', 'tools', 'codeminder-spawn.js'),
+    ];
+    for (const p of candidates) {
+      try {
+        if (fs.existsSync(p)) return p;
+      } catch {
+        // 忽略不可访问路径
+      }
+    }
+    return null;
+  }
+
+  /**
    * 创建新的伪终端
    * @param terminalId 终端唯一标识
-   * @param shell 可选的 shell 路径，默认为 PowerShell
-   * @returns 创建的伪终端实例
+   * @param options 可选：shell 路径、cwd、initialCommand（PowerShell 命令，创建时通过 -Command 注入）
    */
-  create(terminalId: string, shell?: string): pty.IPty {
+  create(
+    terminalId: string,
+    options: { shell?: string; cwd?: string; initialCommand?: string } = {}
+  ): pty.IPty {
     if (this.ptys.has(terminalId)) {
       throw new Error(`Terminal ${terminalId} already exists`);
     }
 
-    // Windows 下使用 PowerShell
-    const shellPath = shell || 'powershell.exe';
+    const shellPath = options.shell || 'powershell.exe';
+    const spawnArgs = options.initialCommand
+      ? ['-NoLogo', '-NoExit', '-Command', options.initialCommand]
+      : [];
 
-    // 为每个终端设置唯一的环境变量，用于识别是哪个终端执行的命令
-    const terminalEnv = {
+    const spawnScriptPath = this.resolveSpawnScriptPath();
+
+    const terminalEnv: Record<string, string> = {
       ...process.env,
       CCTM_TERMINAL_ID: terminalId,
       // 确保使用 UTF-8 编码
       LANG: 'zh_CN.UTF-8',
       CHCP: '65001', // Windows 代码页 65001 表示 UTF-8
     };
+    if (spawnScriptPath) {
+      terminalEnv.CCTM_SPAWN_SCRIPT = spawnScriptPath;
+    }
 
-    const ptyProcess = pty.spawn(shellPath, [], {
+    const ptyProcess = pty.spawn(shellPath, spawnArgs, {
       name: 'xterm-color',
       cols: 80,
       rows: 24,
-      cwd: process.env.HOME || process.env.USERPROFILE || '.',
+      cwd: options.cwd || process.env.HOME || process.env.USERPROFILE || '.',
       env: terminalEnv,
       useConpty: true, // Windows 下使用 ConPTY
       encoding: 'utf8', // 显式设置 UTF-8 编码
