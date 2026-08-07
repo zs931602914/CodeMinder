@@ -111,4 +111,12 @@ describe('buildClaudeSpawnCommand', () => {
     expect(cmd.match(/FromBase64String\('[^']*'\)/)).not.toBeNull();
     expect(cmd.endsWith('claude $p')).toBe(true);
   });
+
+  it('含空格与特殊字符的 prompt：base64 往返完整', () => {
+    const prompt = '读 a.md 后 *删除* 它；保留 b.md';
+    const cmd = buildClaudeSpawnCommand(prompt);
+    const m = cmd.match(/FromBase64String\('([^']+)'\)/);
+    expect(m).not.toBeNull();
+    expect(Buffer.from(m![1], 'base64').toString('utf8')).toBe(prompt);
+  });
 });

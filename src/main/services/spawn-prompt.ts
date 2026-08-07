@@ -120,6 +120,7 @@ export function deriveTitle(body: SpawnBody, fallbackIndex: number): string {
 /**
  * 把初始 prompt 编码为 PowerShell 命令：解码 base64 后调用 claude。
  * 用 base64 规避中文/引号/特殊字符的转义问题。
+ * 注：claude $p 依赖 PowerShell 不对变量做 word splitting（区别于 bash）；完整 prompt 的运行时传递在 Task 11 端到端验证。
  */
 export function buildClaudeSpawnCommand(prompt: string): string {
   const b64 = Buffer.from(prompt, 'utf8').toString('base64');
