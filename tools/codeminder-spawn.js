@@ -51,4 +51,58 @@ function buildPayload(opts) {
   return payload;
 }
 
+const http = require('http');
+
+const HOST = '127.0.0.1';
+const PORT = 13452;
+
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  const payload = buildPayload(opts);
+  const body = JSON.stringify(payload);
+
+  const req = http.request(
+    {
+      hostname: HOST,
+      port: PORT,
+      path: '/spawn',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    },
+    (res) => {
+      let data = '';
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          process.stdout.write(data + '\n');
+          process.exit(0);
+        } else {
+          process.stderr.write(`派生失败 (${res.statusCode}): ${data}\n`);
+          process.exit(1);
+        }
+      });
+    }
+  );
+
+  req.on('error', (e) => {
+    if (e.code === 'ECONNREFUSED') {
+      process.stderr.write(`CodeMinder 未运行（无法连接 ${HOST}:${PORT}）。请先启动 CodeMinder。\n`);
+    } else {
+      process.stderr.write(`派生请求失败: ${e.message}\n`);
+    }
+    process.exit(1);
+  });
+
+  req.write(body);
+  req.end();
+}
+
 module.exports = { parseArgs, buildPayload };
+
+// 仅当直接执行时运行 main（被 require 时不触发）
+if (require.main === module) {
+  main();
+}
