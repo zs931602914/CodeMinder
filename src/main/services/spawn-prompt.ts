@@ -15,7 +15,7 @@ export function buildInitialPrompt(ctx: SpawnContext): string {
   const task = ctx.task?.trim();
   const hasFiles = files.length > 0;
   const hasSkills = skills.length > 0;
-  const hasTask = task && task.length > 0;
+  const hasTask = !!task && task.length > 0;
 
   if (!hasFiles && !hasSkills && !hasTask) {
     return '上下文已就绪，等待你的指示。';
@@ -37,4 +37,67 @@ export function buildInitialPrompt(ctx: SpawnContext): string {
   }
 
   return `请按顺序初始化上下文：\n${indexed.join('；\n')}`;
+}
+
+export interface SpawnBody extends SpawnContext {
+  cwd?: string;
+  focus?: boolean;
+  title?: string;
+  sourceTerminalId?: string;
+}
+
+export interface ValidationResult {
+  ok: boolean;
+  error?: string;
+  normalized: SpawnBody;
+}
+
+const MAX_TASK = 4000;
+const MAX_ARRAY = 50;
+const MAX_STR = 1000;
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every(x => typeof x === 'string');
+}
+
+export function validateSpawnBody(body: unknown): ValidationResult {
+  const fail = (error: string): ValidationResult => ({ ok: false, error, normalized: {} });
+  const normalized: SpawnBody = {};
+
+  if (typeof body !== 'object' || body === null) return fail('请求体必须是对象');
+  const b = body as Record<string, unknown>;
+
+  if (b.files !== undefined) {
+    if (!isStringArray(b.files)) return fail('files 必须是字符串数组');
+    if (b.files.length > MAX_ARRAY) return fail(`files 最多 ${MAX_ARRAY} 项`);
+    normalized.files = b.files;
+  }
+  if (b.skills !== undefined) {
+    if (!isStringArray(b.skills)) return fail('skills 必须是字符串数组');
+    if (b.skills.length > MAX_ARRAY) return fail(`skills 最多 ${MAX_ARRAY} 项`);
+    normalized.skills = b.skills;
+  }
+  if (b.task !== undefined) {
+    if (typeof b.task !== 'string') return fail('task 必须是字符串');
+    if (b.task.length > MAX_TASK) return fail(`task 过长（≤${MAX_TASK}）`);
+    normalized.task = b.task;
+  }
+  if (b.cwd !== undefined) {
+    if (typeof b.cwd !== 'string' || b.cwd.length > MAX_STR) return fail('cwd 非法');
+    normalized.cwd = b.cwd;
+  }
+  if (b.focus !== undefined) {
+    if (typeof b.focus !== 'boolean') return fail('focus 必须是布尔值');
+    normalized.focus = b.focus;
+  }
+  if (b.title !== undefined) {
+    if (typeof b.title !== 'string' || b.title.length > MAX_STR) return fail('title 非法');
+    normalized.title = b.title;
+  }
+  if (b.sourceTerminalId !== undefined) {
+    if (typeof b.sourceTerminalId !== 'string') return fail('sourceTerminalId 非法');
+    normalized.sourceTerminalId = b.sourceTerminalId;
+  }
+
+  return { ok: true, normalized };
 }

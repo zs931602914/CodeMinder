@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildInitialPrompt } from './spawn-prompt';
+import { buildInitialPrompt, validateSpawnBody } from './spawn-prompt';
 
 describe('buildInitialPrompt', () => {
   it('全信息：含 Read、Skill、执行任务', () => {
@@ -37,5 +37,41 @@ describe('buildInitialPrompt', () => {
     expect(p).toContain('用 Read 读取');
     expect(p).toContain('only.md');
     expect(p).toContain('等待我的指示');
+  });
+});
+
+describe('validateSpawnBody', () => {
+  it('空对象合法', () => {
+    const r = validateSpawnBody({});
+    expect(r.ok).toBe(true);
+    expect(r.normalized).toEqual({});
+  });
+
+  it('合法体原样保留', () => {
+    const r = validateSpawnBody({ files: ['a'], skills: ['b'], task: 't', cwd: 'C:/x', focus: false, title: 'T' });
+    expect(r.ok).toBe(true);
+    expect(r.normalized.files).toEqual(['a']);
+    expect(r.normalized.focus).toBe(false);
+  });
+
+  it('files 非数组 → 失败', () => {
+    expect(validateSpawnBody({ files: 'a' }).ok).toBe(false);
+  });
+
+  it('files 元素非字符串 → 失败', () => {
+    expect(validateSpawnBody({ files: ['a', 1] }).ok).toBe(false);
+  });
+
+  it('task 超长 → 失败', () => {
+    expect(validateSpawnBody({ task: 'x'.repeat(4001) }).ok).toBe(false);
+  });
+
+  it('focus 非布尔 → 失败', () => {
+    expect(validateSpawnBody({ focus: 'yes' }).ok).toBe(false);
+  });
+
+  it('非对象根 → 失败', () => {
+    expect(validateSpawnBody(null).ok).toBe(false);
+    expect(validateSpawnBody('s').ok).toBe(false);
   });
 });
