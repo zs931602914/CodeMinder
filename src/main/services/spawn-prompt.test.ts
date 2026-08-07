@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildInitialPrompt, validateSpawnBody, deriveTitle } from './spawn-prompt';
+import { buildInitialPrompt, validateSpawnBody, deriveTitle, buildClaudeSpawnCommand } from './spawn-prompt';
 
 describe('buildInitialPrompt', () => {
   it('全信息：含 Read、Skill、执行任务', () => {
@@ -93,5 +93,22 @@ describe('deriveTitle', () => {
   });
   it('空白 title 回退', () => {
     expect(deriveTitle({ title: '   ', task: '实际任务' }, 1)).toBe('实际任务');
+  });
+});
+
+describe('buildClaudeSpawnCommand', () => {
+  it('含 base64 解码与 claude 调用', () => {
+    const cmd = buildClaudeSpawnCommand('你好，读 a.md');
+    expect(cmd).toContain('FromBase64String');
+    expect(cmd).toContain('claude $p');
+    const m = cmd.match(/FromBase64String\('([^']+)'\)/);
+    expect(m).not.toBeNull();
+    expect(Buffer.from(m![1], 'base64').toString('utf8')).toBe('你好，读 a.md');
+  });
+
+  it('引号与特殊字符不破坏命令结构', () => {
+    const cmd = buildClaudeSpawnCommand('含"双引号"和$变量');
+    expect(cmd.match(/FromBase64String\('[^']*'\)/)).not.toBeNull();
+    expect(cmd.endsWith('claude $p')).toBe(true);
   });
 });
