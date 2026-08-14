@@ -10,6 +10,12 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 let mainWindow: BrowserWindow | null = null;
 
+// 修复：禁用 Windows 原生窗口遮挡检测（CalculateNativeWinOcclusion）
+// Chromium 会把被遮挡/恢复中的窗口判定为不可见并停止合成器出帧，
+// 导致「输入文字不显示、拖动窗口缩放才显示」的问题。
+// 必须在 app ready 之前设置。
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+
 /**
  * 创建主窗口
  */
@@ -34,6 +40,13 @@ function createWindow(): void {
     mainWindow?.show();
     // 初始化窗口闪烁管理器
     windowFlashManager.initialize(mainWindow!);
+  });
+
+  // 修复：从最小化恢复时，Chromium 内部焦点状态可能与 OS 实际窗口状态失步，
+  // 导致 IME 输入法失效（切不了中文），点击一次界面才能恢复。
+  // 恢复时显式把焦点交还给 webContents，强制同步焦点状态。
+  mainWindow.on('restore', () => {
+    mainWindow?.webContents.focus();
   });
 
   // 加载 renderer 页面 - 使用魔法全局变量
