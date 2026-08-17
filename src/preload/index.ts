@@ -44,6 +44,8 @@ export interface ElectronAPI {
 
   // [diag] 诊断：请求主进程打印窗口/GPU 状态
   diagDump: () => void;
+  // [diag] 诊断：主进程在窗口还原后自动请求抓取
+  onDiagAutoCapture: (callback: () => void) => () => void;
 }
 
 // 暴露安全的 API 到渲染进程
@@ -122,6 +124,12 @@ const electronAPI: ElectronAPI = {
   // [diag] 诊断
   diagDump: () => {
     ipcRenderer.send('diag:dump');
+  },
+
+  // [diag] 窗口还原后主进程自动触发抓取
+  onDiagAutoCapture: (callback: () => void) => {
+    ipcRenderer.on('diag:auto-capture', () => callback());
+    return () => ipcRenderer.removeAllListeners('diag:auto-capture');
   },
 };
 

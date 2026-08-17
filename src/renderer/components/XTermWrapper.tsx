@@ -28,6 +28,7 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const onDataRef = useRef(onData);
   const hasNotificationRef = useRef<boolean>(hasNotification);
+  const isActiveRef = useRef<boolean>(isActive);
   const lastClearedRef = useRef<number>(0);
   const [isReady, setIsReady] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
@@ -42,6 +43,11 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
   useEffect(() => {
     hasNotificationRef.current = hasNotification;
   }, [hasNotification]);
+
+  // 保持 isActiveRef 最新
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   // 等待容器有尺寸后再初始化
   useEffect(() => {
@@ -414,6 +420,44 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // 修复：Win+D/最小化还原后偶发 窗口不出帧/IME 失效
+  // 窗口重新可见/获得焦点时：强制重绘全部行 + 重挂终端焦点（重新关联 IME）
+  useEffect(() => {
+    if (!isReady) return;
+
+    const recover = () => {
+      if (!isActiveRef.current) return; // 只处理当前激活的终端
+      // 延迟执行，等窗口状态事件落定
+      setTimeout(() => {
+        const terminal = terminalRef.current;
+        if (!terminal) return;
+        try {
+          // 强制重绘所有行（xterm DOM 渲染器可能丢失隐藏期间的渲染请求）
+          terminal.refresh(0, terminal.rows - 1);
+          // 重挂焦点：仅当焦点在终端 textarea 或 body 上时（不偷取重命名输入框的焦点）
+          const active = document.activeElement;
+          if (active === document.body || active === terminal.textarea) {
+            terminal.focus();
+          }
+        } catch {
+          // 忽略
+        }
+      }, 50);
+    };
+
+    const handleWinFocus = () => recover();
+    const handleVisChange = () => {
+      if (!document.hidden) recover();
+    };
+
+    window.addEventListener('focus', handleWinFocus);
+    document.addEventListener('visibilitychange', handleVisChange);
+    return () => {
+      window.removeEventListener('focus', handleWinFocus);
+      document.removeEventListener('visibilitychange', handleVisChange);
+    };
+  }, [isReady]);
 
   // 复制功能
   const handleCopy = useCallback(() => {

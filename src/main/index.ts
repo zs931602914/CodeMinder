@@ -50,6 +50,13 @@ function createWindow(): void {
   // 恢复时显式把焦点交还给 webContents，强制同步焦点状态。
   mainWindow.on('restore', () => {
     mainWindow?.webContents.focus();
+    // [diag] 还原 500ms 后自动抓取渲染进程状态（排查偶发不出帧/IME失效）
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        console.log(`[diag] ${new Date().toISOString()} --- 还原后自动抓取 ---`);
+        mainWindow.webContents.send('diag:auto-capture');
+      }
+    }, 500);
   });
 
   // [diag] 窗口状态事件追踪（问题定位后移除）
