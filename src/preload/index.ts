@@ -41,6 +41,9 @@ export interface ElectronAPI {
   onTerminalExit: (callback: (terminalId: string, exitCode: number) => void) => () => void;
   onSessionsUpdate: (callback: (sessions: TerminalSession[], activeId: string | null) => void) => () => void;
   onNotificationUpdate: (callback: (notifications: Notification[]) => void) => () => void;
+
+  // [diag] 诊断：请求主进程打印窗口/GPU 状态
+  diagDump: () => void;
 }
 
 // 暴露安全的 API 到渲染进程
@@ -114,6 +117,11 @@ const electronAPI: ElectronAPI = {
     const handler = (_: unknown, notifications: Notification[]) => callback(notifications);
     ipcRenderer.on('terminal:notificationUpdate', handler);
     return () => ipcRenderer.removeListener('terminal:notificationUpdate', handler);
+  },
+
+  // [diag] 诊断
+  diagDump: () => {
+    ipcRenderer.send('diag:dump');
   },
 };
 

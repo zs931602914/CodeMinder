@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import { registerIpcHandlers } from './ipc';
 import { httpNotificationService } from './services/http-notification-service';
 import { namedPipeBridgeService } from './services/named-pipe-bridge';
@@ -9,6 +9,9 @@ declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 let mainWindow: BrowserWindow | null = null;
+
+// [diag] 供 diag:dump 使用的时閭戳函数
+const diagDumpTs = () => new Date().toISOString();
 
 // 修复：禁用 Windows 原生窗口遮挡检测（CalculateNativeWinOcclusion）
 // Chromium 会把被遮挡/恢复中的窗口判定为不可见并停止合成器出帧，
@@ -49,6 +52,11 @@ function createWindow(): void {
     mainWindow?.webContents.focus();
   });
 
+  // [diag] 窗口状态事件追踪（问题定位后移除）
+  for (const evt of ['focus', 'blur', 'minimize', 'restore', 'show', 'hide', 'maximize', 'unmaximize']) {
+    (mainWindow as any).on(evt, () => console.log(`[diag] ${new Date().toISOString()} win:${evt} focused=${mainWindow?.isFocused()}`));
+  }
+
   // 加载 renderer 页面 - 使用魔法全局变量
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
@@ -77,6 +85,20 @@ function createWindow(): void {
 
 // 应用程序准备就绪
 app.whenReady().then(() => {
+  // [diag] GPU 状态（合成器停帧问题排查：GPU 进程崩溃/禁用会导致界面不刷新）
+  console.log(`[diag] ${new Date().toISOString()} GPU status:`, JSON.stringify(app.getGPUFeatureStatus()));
+  app.on('child-process-gone', (_e, details) => {
+    console.error(`[diag] ${new Date().toISOString()} child-process-gone: type=${details.type} reason=${details.reason}`);
+  });
+
+  // [diag] F9 现场抓取：打印窗口与 GPU 状态
+  ipcMain.on('diag:dump', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      console.log(`[diag] ${diagDumpTs()} F9主进程现场: focused=${mainWindow.isFocused()} visible=${mainWindow.isVisible()} minimized=${mainWindow.isMinimized()} maximized=${mainWindow.isMaximized()} fullscreen=${mainWindow.isFullScreen()} url=${mainWindow.webContents.getURL().slice(0, 50)}`);
+    }
+    console.log(`[diag] ${diagDumpTs()} GPU status:`, JSON.stringify(app.getGPUFeatureStatus()));
+  });
+
   // 移除顶部菜单栏
   Menu.setApplicationMenu(null);
 

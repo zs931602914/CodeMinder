@@ -36,3 +36,24 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason);
 });
+
+// ========== [diag] 渲染停帧/IME 失效问题诊断埋点（问题定位后移除） ==========
+const diagLog = (msg: string) => console.log(`[diag] ${new Date().toISOString()} ${msg}`);
+
+document.addEventListener('visibilitychange', () => {
+  diagLog(`visibilitychange hidden=${document.hidden} state=${document.visibilityState}`);
+});
+window.addEventListener('focus', () => diagLog('window focus'));
+window.addEventListener('blur', () => diagLog('window blur'));
+
+// F9：问题复现时现场抓取渲染进程 + 主进程状态，输出到主进程控制台
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'F9') {
+    const active = document.activeElement;
+    const desc = active
+      ? `${active.tagName.toLowerCase()}${active.className ? '.' + String(active.className).split(' ').join('.') : ''}`
+      : 'null';
+    diagLog(`F9现场: hasFocus=${document.hasFocus()} visibility=${document.visibilityState} hidden=${document.hidden} activeElement=${desc}`);
+    window.electronAPI.diagDump();
+  }
+});
