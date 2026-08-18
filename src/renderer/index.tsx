@@ -66,7 +66,9 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// rAF 心跳：页面可见但 rAF 停滞 >2秒 → 合成器停帧的直接证据
+// rAF 心跳：窗口有焦点但 rAF 停滞 >2秒 → 出帧停滞的直接证据。
+// 注意：用 hasFocus() 而非 !document.hidden 判断——若 visibilityState 卡死在 hidden
+// （当前主假设），后者恰好静默；hasFocus() 反映 OS 级焦点，不受 visibility 误判影响。
 let diagLastFrame = performance.now();
 const diagRafLoop = () => {
   diagLastFrame = performance.now();
@@ -75,7 +77,7 @@ const diagRafLoop = () => {
 requestAnimationFrame(diagRafLoop);
 setInterval(() => {
   const stallMs = performance.now() - diagLastFrame;
-  if (!document.hidden && stallMs > 2000) {
-    diagLog(`WARNING: 页面可见但 rAF 已停滞 ${Math.round(stallMs)}ms → 合成器停帧! hasFocus=${document.hasFocus()}`);
+  if (document.hasFocus() && stallMs > 2000) {
+    diagLog(`WARNING: 窗口有焦点但 rAF 已停滞 ${Math.round(stallMs)}ms → 出帧停滞! visibility=${document.visibilityState} hidden=${document.hidden}`);
   }
 }, 1000);
