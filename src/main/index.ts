@@ -87,6 +87,17 @@ function createWindow(): void {
     }, 500);
   });
 
+  // [diag] 窗口从隐藏到显示（冷启动 ready-to-show、睡眠唤醒后系统拉起等）
+  // 也自动抓取——08-20 复现走的是 win:show 而非 restore，旧埋点没抓到现场
+  mainWindow.on('show', () => {
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        diagLog('--- show 后自动抓取 ---');
+        mainWindow.webContents.send('diag:auto-capture');
+      }
+    }, 500);
+  });
+
   // [diag] 窗口状态事件追踪（问题定位后移除）
   for (const evt of ['focus', 'blur', 'minimize', 'restore', 'show', 'hide', 'maximize', 'unmaximize']) {
     (mainWindow as any).on(evt, () => diagLog(`win:${evt} focused=${mainWindow?.isFocused()}`));
@@ -134,6 +145,31 @@ app.whenReady().then(() => {
       diagLog(`F9主进程现场: focused=${mainWindow.isFocused()} visible=${mainWindow.isVisible()} minimized=${mainWindow.isMinimized()} maximized=${mainWindow.isMaximized()} fullscreen=${mainWindow.isFullScreen()} url=${mainWindow.webContents.getURL().slice(0, 50)}`);
     }
     diagLog(`GPU status: ${JSON.stringify(app.getGPUFeatureStatus())}`);
+  });
+
+  // [diag] 焦点失步检测：渲染进程每 5s 上报 hasFocus，与主进程 isFocused() 对比。
+  // 08-20 复现推断：Chromium 误判焦点/可见性 → 合成器停帧（点击才出一帧），
+  // 同时 hasFocus()=false 使旧 rAF 告警静默。失步 >10s 即抓现场。
+  let focusMismatchSince = 0;
+  let focusMismatchAlerted = false;
+  ipcMain.on('diag:renderer-focus', (_e, payload: { hasFocus: boolean; visibility: string }) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const mainFocused = mainWindow.isFocused();
+    const mismatch = mainFocused !== payload.hasFocus;
+    if (mismatch) {
+      if (!focusMismatchSince) focusMismatchSince = Date.now();
+      if (!focusMismatchAlerted && Date.now() - focusMismatchSince > 10000) {
+        focusMismatchAlerted = true;
+        diagLog(`WARNING: 焦点状态失步 >10s: 主进程 focused=${mainFocused} 渲染 hasFocus=${payload.hasFocus} visibility=${payload.visibility} → 疑似合成器停帧诱因`);
+        diagLog(`GPU status: ${JSON.stringify(app.getGPUFeatureStatus())}`);
+      }
+    } else if (focusMismatchSince) {
+      if (focusMismatchAlerted) {
+        diagLog(`焦点状态已重新同步: 主进程 focused=${mainFocused} 渲染 hasFocus=${payload.hasFocus}`);
+      }
+      focusMismatchSince = 0;
+      focusMismatchAlerted = false;
+    }
   });
 
   // 移除顶部菜单栏

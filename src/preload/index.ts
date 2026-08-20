@@ -44,7 +44,9 @@ export interface ElectronAPI {
 
   // [diag] 诊断：请求主进程打印窗口/GPU 状态
   diagDump: () => void;
-  // [diag] 诊断：主进程在窗口还原后自动请求抓取
+  // [diag] 诊断：上报渲染进程焦点/可见性状态（主进程用于失步检测）
+  diagReportFocus: (hasFocus: boolean, visibility: string) => void;
+  // [diag] 诊断：主进程在窗口还原/显示后自动请求抓取
   onDiagAutoCapture: (callback: () => void) => () => void;
 }
 
@@ -124,6 +126,11 @@ const electronAPI: ElectronAPI = {
   // [diag] 诊断
   diagDump: () => {
     ipcRenderer.send('diag:dump');
+  },
+
+  // [diag] 上报渲染进程焦点状态（主进程与 isFocused() 对比检测失步）
+  diagReportFocus: (hasFocus: boolean, visibility: string) => {
+    ipcRenderer.send('diag:renderer-focus', { hasFocus, visibility });
   },
 
   // [diag] 窗口还原后主进程自动触发抓取

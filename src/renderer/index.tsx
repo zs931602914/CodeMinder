@@ -66,18 +66,40 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// rAF 心跳：窗口有焦点但 rAF 停滞 >2秒 → 出帧停滞的直接证据。
-// 注意：用 hasFocus() 而非 !document.hidden 判断——若 visibilityState 卡死在 hidden
-// （当前主假设），后者恰好静默；hasFocus() 反映 OS 级焦点，不受 visibility 误判影响。
+// rAF 心跳：停滞 >2秒即告警并自动抓取现场。
+// 注意：不再用 hasFocus() 做门限——08-20 复现时焦点状态疑似失步（hasFocus()=false），
+// 旧条件恰好静默，现场全丢。停滞就是停滞，快照随告警一起落盘。
 let diagLastFrame = performance.now();
+let diagStallStart = 0;   // 停滞起始时刻（0=未停滞）
+let diagStallLogged = 0;  // 停滞期间最后一次告警时刻（限频用）
 const diagRafLoop = () => {
+  if (diagStallStart) {
+    const dur = Math.round(performance.now() - diagStallStart);
+    if (dur > 2000) {
+      // rAF 恢复：补记停滞总时长（若停滞期间 setInterval 被节流，这是唯一记录）
+      diagLog(`rAF 停滞已恢复: 持续 ${dur}ms`);
+    }
+    diagStallStart = 0;
+    diagStallLogged = 0;
+  }
   diagLastFrame = performance.now();
   requestAnimationFrame(diagRafLoop);
 };
 requestAnimationFrame(diagRafLoop);
 setInterval(() => {
   const stallMs = performance.now() - diagLastFrame;
-  if (document.hasFocus() && stallMs > 2000) {
-    diagLog(`WARNING: 窗口有焦点但 rAF 已停滞 ${Math.round(stallMs)}ms → 出帧停滞! visibility=${document.visibilityState} hidden=${document.hidden}`);
+  if (stallMs > 2000) {
+    if (!diagStallStart) diagStallStart = diagLastFrame;
+    if (performance.now() - diagStallLogged > 5000) {
+      diagStallLogged = performance.now();
+      diagLog(`WARNING: rAF 停滞 ${Math.round(stallMs)}ms hasFocus=${document.hasFocus()} visibility=${document.visibilityState} hidden=${document.hidden}`);
+      window.electronAPI.diagDump(); // 自动抓主进程窗口/GPU 现场
+    }
   }
 }, 1000);
+
+// 焦点状态每 5s 上报主进程，主进程与自己的 isFocused() 对比，
+// 失步持续 >10s 即告警——「焦点失步 → 合成器停帧」假说的直接证据
+setInterval(() => {
+  window.electronAPI.diagReportFocus(document.hasFocus(), document.visibilityState);
+}, 5000);
