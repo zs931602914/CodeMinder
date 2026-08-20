@@ -6,23 +6,36 @@
 - A. 窗口还原后输入的文字不显示，拖动窗口/切换后一次性涌出（出帧停滞）
 - B. 输入法卡英文，切不了中文（08-17 后未再出现）
 
-**修复史（症状 A 三轮未愈，症状 B 已愈）**
+**修复史（症状 A 四轮未愈，症状 B 已愈）**
 - 08-14 `1433cdd`: 禁用 `CalculateNativeWinOcclusion` + restore 时 `webContents.focus()`
   → 治好 B；A 仍复发（workaround 生效中仍复发，遮挡检测不是完整根因）
 - 08-17 `fb0619f`: restore 时 xterm 全量 `refresh(0)` + 重挂焦点
   → A 仍复发（refresh 只标记脏区，实际绘制仍依赖 rAF，rAF 不跑则白调）
+- 08-18 `2838c9b`: `backgroundThrottling=false` + diag.log 落盘 + rAF 心跳告警
+  → 08-20 复现时 rAF 告警静默、无 restore 事件 → 一个现场都没抓到
+- 08-20 `fa50cea`: 告警去 hasFocus 门限 + 焦点失步检测 + show 自动抓取（纯埋点）
 
-**当前主假设（08-18）**
-窗口还原后渲染进程 `visibilityState` 卡在 hidden → rAF 被 Chromium 节流至停 → xterm 渲染循环停摆；拖动/切换触发 resize 强制同步重绘，内容一次性涌出。
+**08-20 复现现场（用户口述，无日志佐证）**
+- 早上 09:01 系统从睡眠唤醒，09:40 应用冷启动（win:show，非 restore）
+- 症状：打字不显示，点击窗口后涌出；spinner ⠸ 点一下动一帧（合成器停帧铁证）
+- 问题后来自行恢复；全程无 rAF 告警、无 restore、无自动抓取
+- 机器装向日葵虚拟显卡驱动（OrayIddDriver），系统每天 12:00/18:32 定时睡眠
 
-**当前措施（08-18）**
-- `webPreferences.backgroundThrottling: false`：即使误判 hidden，rAF 照常跑（缓解 + 验证主假设）
-- 诊断日志落盘 `userData/diag.log`（超 5MB 轮转为 diag.log.1），终端关闭不再丢现场
-- rAF 心跳告警条件由 `!document.hidden` 改为 `document.hasFocus()`（堵住 visibility 卡死时静默的盲区）
+**当前主假设（08-20，取代旧假设）**
+Chromium 焦点/可见性状态失步（窗口实际可见且接受键盘输入，但渲染进程认为
+hasFocus()=false 或 hidden）→ 合成器停帧（点击/交互事件踢一帧）；同一失步使旧
+告警条件 `hasFocus() && stall>2s` 静默，现场全丢。触发器疑似睡眠唤醒/显示器拓扑
+变化（向日葵虚拟显卡驱动嫌疑）。
 
-**验证标准**
-- `backgroundThrottling: false` 后不再复发 → 主假设成立，保留该设置（代价：最小化时仍渲染，可接受）
-- 仍复发 → `diag.log` 中「win:restore / 还原后自动抓取 / rAF 停滞 WARNING / GPU status」现场可定案
+**当前措施（08-20 `fa50cea`，纯诊断埋点）**
+- rAF 停滞无条件告警 + 自动 diagDump（主进程窗口/GPU 现场随告警落盘）
+- 渲染进程每 5s 上报焦点状态，主进程与 `isFocused()` 对比，失步 >10s 告警
+- `win:show` 后 500ms 自动抓取（覆盖睡眠唤醒/冷启动场景）
+
+**验证标准（下次复现时）**
+- 复现时先按 F9 手动抓现场（新埋点需重启 dev 实例生效）
+- 若 diag.log 出现「焦点状态失步」或「rAF 停滞」告警 → 假说定案，进入修复阶段
+- 若两个告警都未出现而症状仍在 → 帧在产生但 DWM 未呈现，转 OS/驱动层排查（向日葵虚拟显卡）
 
 **遗留**
 - `named-pipe-bridge.ts:210` 既有 TS 报错（`Error.code` 类型），待修
