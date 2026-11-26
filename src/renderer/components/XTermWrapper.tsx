@@ -103,6 +103,11 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
       onDataRef.current?.(data);
     });
 
+    // [diag] 三段心跳之一：xterm 真正执行了重绘（区分「收到数据没画」vs「画了没上屏」）
+    terminal.onRender(() => {
+      (window as any).__diagLastRender = performance.now();
+    });
+
     // 选中文本时自动复制到剪贴板
     terminal.onSelectionChange(() => {
       const selection = terminal.getSelection();
@@ -383,6 +388,8 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
 
     const unsubscribe = window.electronAPI.onTerminalData((id, data) => {
       if (id === terminalId && terminalRef.current) {
+        // [diag] 三段心跳之一：pty 回显数据到达渲染进程
+        (window as any).__diagLastData = performance.now();
         terminalRef.current.write(data);
       }
     });
