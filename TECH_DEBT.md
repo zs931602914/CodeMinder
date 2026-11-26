@@ -91,3 +91,37 @@ hasFocus()=false 或 hidden）→ 合成器停帧（点击/交互事件踢一帧
 **遗留**
 - `named-pipe-bridge.ts:210` 既有 TS 报错（`Error.code` 类型），待修
 - 问题定位后移除全部 [diag] 埋点与 diag.log 落盘逻辑
+
+## 2026-11-26 第七轮: 滚动条跳顶——清除回滚区后不恢复跟随 + 滚动同步标志错位
+
+**症状**
+- 终端里的 TUI（pi）清屏重绘后，滚动条跳到回滚区最顶端；视图在顶部时想往下滚，滚动条动了又弹回顶部
+
+**根因（diag.log 归因实锤；三条路径同一来源：xterm 5.3.0 的滚动状态机）**
+- pi 重绘时发 `ESC[3J` 清回滚区再整段重画（缓冲 31ms 内 49→1049 行）。xterm 收到后把 ydisp/ybase 归零，
+  但不复位「用户正在向上翻阅」(isUserScrolling)——只要之前往上翻过（哪怕 1 行），重绘灌进来的行都不被跟随，
+  视图卡在新回滚区顶端
+- Viewport 用单个布尔标志 `_ignoreNextScrollEvent` 区分「自己同步滚动条」与「用户滚动」，输出密集时错位：
+  - 清屏重绘中，滚动条先被钳到 0、下一帧又被同步到中间，两次变化并成一个事件 → xterm 把自己的同步当成用户滚动，
+    视图被带离底部，重绘剩余的行把它顶到顶端（14:59:55 现场，用户并未滚动）
+  - 标志待命时到达的用户滚动被直接丢弃：滚动条到位、视图不动、随即弹回（45 分钟 21 次）
+
+**修复（XTermWrapper.tsx 顶部「滚动修复」功能块，均为公开 API）**
+- `resumeFollowAfterClearScrollback`：经 Parser API 捕获 `ESC[3J`，确有回滚区时先 `scrollToBottom()` 复位翻阅状态。
+  注意处理器内抛异常会让 xterm 的 WriteBuffer 无限重试同一段数据、冻住终端，故有 try/catch
+- `correctScrollDesync`：capture 记录处理前状态，bubble（xterm 处理后）纠正——① 跟随中且非用户输入的滚动不许
+  把视图带离底部；② 用户滚动被吞则按滚动条所在行补上。是否用户输入：400ms 内落在终端内的滚轮/导航键，
+  或落在滚动条上的鼠标
+- 同日另修：IME 打拼音时终端被横向顶左——`.terminal-content` 的 `overflow:hidden` → `clip`（app.css）
+
+**验证**
+- 隔离复现台（同版 Electron/xterm + 仓库真实样式，CDP 驱动）：三组 RED/GREEN 均通过（修复关复现、修复开通过、
+  对照不受影响），12 个既有场景 50 个快照零失步
+- 线上 diag.log：15:18:47 / 15:18:56 两次 ESC[3J 重绘，视图保持底部；期间滚轮全部「xterm已对齐」
+
+**遗留**
+- 确认稳定后移除本轮 [diag] 埋点：XTermWrapper 的「滚动诊断」探针块、`diagAppWrite`、`fit回底` / `标签切换` 打点
+  （顶部「滚动修复」功能块是功能代码，保留）
+- 每次 fit 都是「fit() 先 resize 到 N 列、再 resize 到 N−1 列」，终端挂载连做 3 次 fit = 6 次 xterm 重排 + 3 次 PTY
+  resize，而每次 PTY resize 都会触发 pi 清屏重绘；可合并为一次
+- 触控、触控笔等未跟踪的输入方式，在跟随状态下滚动会被纠正① 拉回底部（鼠标、触控板、键盘不受影响）
