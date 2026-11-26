@@ -3,6 +3,13 @@ const path = require('path');
 module.exports = {
   mode: process.env.NODE_ENV || 'development',
   target: 'electron-main',
+  // 持久化编译缓存：二次启动跳过未变更模块的重新编译（node_modules/.cache/webpack）
+  cache: {
+    type: 'filesystem',
+    buildDependencies: {
+      config: [__filename],
+    },
+  },
   entry: './src/main/index.ts',
   output: {
     path: path.resolve(__dirname, '.webpack', 'main'),
