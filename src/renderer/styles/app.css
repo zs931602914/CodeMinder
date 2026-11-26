@@ -199,7 +199,11 @@ body {
 .terminal-content {
   flex: 1;
   display: flex;
-  overflow: hidden;
+  /* 必须用 clip 而非 hidden：hidden 仍可被程序滚动。IME 打拼音时 xterm 会把隐藏 textarea
+   * 拉宽到拼音串宽度（CompositionHelper.updateCompositionElements），光标靠近右缘则 caret
+   * 越界，Chromium "显露光标" 随即横向滚动本元素，把整个终端顶左。
+   * clip 不创建滚动容器，从根上杜绝；实测滚动也不会转移到 html/body。 */
+  overflow: clip;
   position: relative;
 }
 
