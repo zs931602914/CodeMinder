@@ -436,10 +436,26 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
           // 强制重绘所有行（xterm DOM 渲染器可能丢失隐藏期间的渲染请求）
           terminal.refresh(0, terminal.rows - 1);
           // 重挂焦点：仅当焦点在终端 textarea 或 body 上时（不偷取重命名输入框的焦点）
-          const active = document.activeElement;
-          if (active === document.body || active === terminal.textarea) {
-            terminal.focus();
-          }
+          // Chromium 在窗口激活尚未完成时会静默丢弃 focus() 请求（实测：切窗回来后
+          // 一次性 50ms focus 会永久失败，焦点停在 body，键盘输入全丢），
+          // 因此轮询确认直到焦点真正落到 textarea，最多重试 10 次。
+          const tryFocus = (attempt: number): void => {
+            const active = document.activeElement;
+            if (active === terminal.textarea) {
+              terminal.focus(); // 已有焦点也重挂一次（重新关联 IME）
+              if (attempt > 0) console.log(`[diag] ${new Date().toISOString()} 焦点已恢复（第 ${attempt} 次重试）`);
+              return;
+            }
+            if (attempt > 10) {
+              console.log(`[diag] ${new Date().toISOString()} 焦点恢复失败：activeElement=${active ? active.tagName : 'null'}`);
+              return;
+            }
+            if (active === document.body || active === null) {
+              terminal.focus();
+              setTimeout(() => tryFocus(attempt + 1), 100);
+            }
+          };
+          tryFocus(0);
         } catch {
           // 忽略
         }

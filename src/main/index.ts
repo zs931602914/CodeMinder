@@ -73,11 +73,23 @@ function createWindow(): void {
     windowFlashManager.initialize(mainWindow!);
   });
 
-  // 修复：从最小化恢复时，Chromium 内部焦点状态可能与 OS 实际窗口状态失步，
-  // 导致 IME 输入法失效（切不了中文），点击一次界面才能恢复。
-  // 恢复时显式把焦点交还给 webContents，强制同步焦点状态。
+  // 修复：Win+D 还原只取消最小化、不激活窗口（08-20 日志实证：restore→blur、
+  // focused=false 持续到用户手动点击）。未激活的窗口收不到键盘输入，IME 也
+  // 切不了中文（TSF 要求窗口真正激活）。webContents.focus() 只作用于渲染进程
+  // 内部焦点，无法完成 OS 级激活，必须先 win.focus()（SetForegroundWindow）。
+  // 窗口激活成功后，渲染进程 XTermWrapper 的 recover() 会自动重挂 IME。
   mainWindow.on('restore', () => {
+    mainWindow?.focus();
     mainWindow?.webContents.focus();
+    // [diag] SetForegroundWindow 可能被前台锁拒绝；200ms 后验证，失败则置顶切换强制激活
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
+        diagLog('restore后窗口未激活，置顶切换强制激活');
+        mainWindow.setAlwaysOnTop(true);
+        mainWindow.focus();
+        mainWindow.setAlwaysOnTop(false);
+      }
+    }, 200);
     // [diag] 还原 500ms 后自动抓取渲染进程状态（排查偶发不出帧/IME失效）
     setTimeout(() => {
       if (mainWindow && !mainWindow.isDestroyed()) {
