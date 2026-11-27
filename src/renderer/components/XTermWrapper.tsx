@@ -96,6 +96,23 @@ const correctScrollDesync = (terminal: Terminal): (() => void) => {
 };
 // ===== 滚动修复结束 =====
 
+// [fix] 打拼音时把拼音框整体左移到终端右缘内。根因：xterm 把组合串显示在 .composition-view 里，定位在光标处且不限宽
+// （CompositionHelper.updateCompositionElements，每次渲染都会重设 left），光标靠近右缘时拼音框越出终端，
+// 被 .terminal-content 的 overflow:clip 整段裁掉，只剩前几个字母、看不到后面输了什么。
+// 这里监听 xterm 对拼音框的每一次定位，越界就左移；不动隐藏 textarea（候选窗在屏内由输入法自己保证）。
+const keepCompositionInView = (terminal: Terminal): (() => void) => {
+  const view = terminal.element?.querySelector('.composition-view') as HTMLElement | null;
+  const screen = terminal.element?.querySelector('.xterm-screen') as HTMLElement | null;
+  if (!view || !screen) return () => {};
+  const clamp = (): void => {
+    const maxLeft = screen.clientWidth - view.getBoundingClientRect().width;
+    if (parseFloat(view.style.left) > maxLeft) view.style.left = `${Math.max(0, maxLeft)}px`;
+  };
+  const observer = new MutationObserver(clamp);
+  observer.observe(view, { attributes: true, attributeFilter: ['style'] });
+  return () => observer.disconnect();
+};
+
 // [diag] 应用自己写 scrollTop 的时刻（问题定位后随其余 [diag] 埋点移除）
 const diagAppWrite = { fit: 0, hack: 0 };
 
@@ -193,6 +210,9 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
 
     // 纠正 xterm 滚动同步标志错位造成的两类问题：视图被非用户滚动带离底部、用户滚动被吞（见 correctScrollDesync）
     const undoScrollGuard = correctScrollDesync(terminal);
+
+    // 光标靠近右缘时拼音框越界被裁，左移到终端内（见 keepCompositionInView）
+    const undoCompositionClamp = keepCompositionInView(terminal);
 
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
@@ -480,6 +500,7 @@ export const XTermWrapper: React.FC<XTermWrapperProps> = React.memo(({
       cancelAnimationFrame(diagFrame);
       resumeFollow.dispose();
       undoScrollGuard();
+      undoCompositionClamp();
       terminal.dispose();
       terminalRef.current = null;
       fitAddonRef.current = null;
